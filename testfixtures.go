@@ -21,7 +21,7 @@ import (
 type Loader struct {
 	db            *sql.DB
 	helper        helper
-	fixturesFiles []*fixtureFile
+	FixturesFiles []*fixtureFile
 
 	skipTestDatabaseCheck bool
 	location              *time.Location
@@ -40,12 +40,12 @@ type fixtureFile struct {
 	path       string
 	fileName   string
 	content    []byte
-	insertSQLs []insertSQL
+	InsertSQLs []insertSQL
 }
 
 type insertSQL struct {
-	sql    string
-	params []interface{}
+	SQL    string
+	Params []interface{}
 }
 
 var (
@@ -223,7 +223,7 @@ func Directory(dir string) func(*Loader) error {
 		if err != nil {
 			return err
 		}
-		l.fixturesFiles = append(l.fixturesFiles, fixtures...)
+		l.FixturesFiles = append(l.FixturesFiles, fixtures...)
 		return nil
 	}
 }
@@ -235,7 +235,7 @@ func Files(files ...string) func(*Loader) error {
 		if err != nil {
 			return err
 		}
-		l.fixturesFiles = append(l.fixturesFiles, fixtures...)
+		l.FixturesFiles = append(l.FixturesFiles, fixtures...)
 		return nil
 	}
 }
@@ -247,7 +247,7 @@ func Paths(paths ...string) func(*Loader) error {
 		if err != nil {
 			return err
 		}
-		l.fixturesFiles = append(l.fixturesFiles, fixtures...)
+		l.FixturesFiles = append(l.FixturesFiles, fixtures...)
 		return nil
 	}
 }
@@ -259,7 +259,7 @@ func FilesMultiTables(files ...string) func(*Loader) error {
 		if err != nil {
 			return err
 		}
-		l.fixturesFiles = append(l.fixturesFiles, fixtures...)
+		l.FixturesFiles = append(l.FixturesFiles, fixtures...)
 		return nil
 	}
 }
@@ -373,8 +373,8 @@ func (l *Loader) Load() error {
 	}
 
 	err := l.helper.disableReferentialIntegrity(l.db, func(tx *sql.Tx) error {
-		modifiedTables := make(map[string]bool, len(l.fixturesFiles))
-		for _, file := range l.fixturesFiles {
+		modifiedTables := make(map[string]bool, len(l.FixturesFiles))
+		for _, file := range l.FixturesFiles {
 			tableName := file.fileNameWithoutExtension()
 			modified, err := l.helper.isTableModified(tx, tableName)
 			if err != nil {
@@ -385,7 +385,7 @@ func (l *Loader) Load() error {
 
 		// Delete existing table data for specified fixtures before populating the data. This helps avoid
 		// DELETE CASCADE constraints when using the `UseAlterConstraint()` option.
-		for _, file := range l.fixturesFiles {
+		for _, file := range l.FixturesFiles {
 			modified := modifiedTables[file.fileNameWithoutExtension()]
 			if !modified {
 				continue
@@ -395,20 +395,20 @@ func (l *Loader) Load() error {
 			}
 		}
 
-		for _, file := range l.fixturesFiles {
+		for _, file := range l.FixturesFiles {
 			modified := modifiedTables[file.fileNameWithoutExtension()]
 			if !modified {
 				continue
 			}
 			err := l.helper.whileInsertOnTable(tx, file.fileNameWithoutExtension(), func() error {
-				for j, i := range file.insertSQLs {
-					if _, err := tx.Exec(i.sql, i.params...); err != nil {
+				for j, i := range file.InsertSQLs {
+					if _, err := tx.Exec(i.SQL, i.Params...); err != nil {
 						return &InsertError{
 							Err:    err,
 							File:   file.fileName,
 							Index:  j,
-							SQL:    i.sql,
-							Params: i.params,
+							SQL:    i.SQL,
+							Params: i.Params,
 						}
 					}
 				}
@@ -463,7 +463,7 @@ func (l *Loader) buildInterfacesSlice(records interface{}) ([]interface{}, error
 }
 
 func (l *Loader) buildInsertSQLs() error {
-	for _, f := range l.fixturesFiles {
+	for _, f := range l.FixturesFiles {
 		var records interface{}
 		if err := yaml.Unmarshal(f.content, &records); err != nil {
 			return fmt.Errorf("testfixtures: could not unmarshal YAML: %w", err)
@@ -474,7 +474,7 @@ func (l *Loader) buildInsertSQLs() error {
 			return err
 		}
 
-		f.insertSQLs = make([]insertSQL, 0, len(result))
+		f.InsertSQLs = make([]insertSQL, 0, len(result))
 
 		for _, record := range result {
 			recordMap, ok := record.(map[string]interface{})
@@ -487,7 +487,7 @@ func (l *Loader) buildInsertSQLs() error {
 				return err
 			}
 
-			f.insertSQLs = append(f.insertSQLs, insertSQL{sql, values})
+			f.InsertSQLs = append(f.InsertSQLs, insertSQL{sql, values})
 		}
 	}
 
